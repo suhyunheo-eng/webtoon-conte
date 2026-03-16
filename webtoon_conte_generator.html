@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>웹툰 글 콘티 생성기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; background: #0d0d14; color: #e2e2ee; min-height: 100vh; }
+
+  /* API Key Banner */
+  #api-banner { background: #16161f; border-bottom: 1px solid #22222f; padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #api-banner label { font-size: 11px; color: #7b6fff; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+  #api-key-input { flex: 1; min-width: 260px; background: #0d0d14; border: 1px solid #22222f; border-radius: 6px; color: #e2e2ee; font-size: 13px; padding: 6px 12px; outline: none; font-family: monospace; }
+  #api-key-input:focus { border-color: #7b6fff; }
+  #api-key-status { font-size: 11px; color: #666680; }
+  #api-key-status.ok { color: #6bffb8; }
+  .toggle-vis { background: none; border: 1px solid #22222f; color: #666680; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 11px; }
+
+  /* Header */
+  header { background: #16161f; border-bottom: 1px solid #22222f; padding: 0 20px; display: flex; align-items: center; height: 48px; gap: 10px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #7b6fff; }
+  header h1 { font-weight: 700; letter-spacing: 1px; font-size: 14px; }
+  .version { margin-left: auto; font-size: 11px; color: #666680; }
+
+  /* Tabs */
+  .tabs { display: flex; background: #16161f; border-bottom: 1px solid #22222f; }
+  .tab-btn { padding: 10px 22px; border: none; background: none; cursor: pointer; color: #666680; font-weight: 400; border-bottom: 2px solid transparent; font-size: 13px; transition: all 0.2s; }
+  .tab-btn.active { color: #7b6fff; font-weight: 700; border-bottom-color: #7b6fff; }
+
+  /* Content */
+  .content { display: none; }
+  .content.active { display: block; }
+
+  /* Input view */
+  .input-wrap { max-width: 820px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  .cut-bar { background: #16161f; border: 1px solid #22222f; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cut-bar span { font-size: 12px; color: #666680; }
+  .cut-group { display: flex; align-items: center; gap: 6px; }
+  .cut-group label { font-size: 11px; color: #666680; }
+  .cut-num { width: 58px; background: #0d0d14; border: 1px solid #22222f; border-radius: 6px; color: #e2e2ee; font-size: 14px; font-weight: 700; padding: 4px 8px; text-align: center; outline: none; }
+  .cut-num:focus { border-color: #7b6fff; }
+  .cut-badge { background: #2d2850; color: #c8b8ff; border-radius: 20px; padding: 2px 12px; font-size: 11px; }
+  .warn-badge { background: #1a1600; color: #ffe066; border-radius: 6px; padding: 2px 10px; font-size: 11px; }
+
+  .field-label { font-size: 11px; font-weight: 700; color: #7b6fff; letter-spacing: 1px; display: block; margin-bottom: 6px; }
+  textarea { width: 100%; background: #16161f; border: 1px solid #22222f; border-radius: 8px; color: #e2e2ee; font-size: 13px; padding: 12px 14px; line-height: 1.85; outline: none; resize: vertical; font-family: inherit; }
+  textarea:focus { border-color: #7b6fff; }
+
+  .file-row { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .file-btn { background: #16161f; border: 1px solid #22222f; color: #666680; border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 12px; }
+  .file-badge { background: #2d2850; color: #c8b8ff; border-radius: 6px; padding: 3px 10px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+  .remove-file { cursor: pointer; }
+
+  .action-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .example-btn { background: none; border: 1px solid #22222f; color: #666680; border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; }
+  .action-right { display: flex; gap: 10px; align-items: center; }
+  .cancel-btn { background: none; border: 1px solid #ff6b6b; color: #ff6b6b; border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 12px; }
+  .generate-btn { background: #7b6fff; border: none; color: #fff; border-radius: 8px; padding: 10px 28px; cursor: pointer; font-weight: 700; font-size: 14px; min-width: 160px; transition: background 0.2s; }
+  .generate-btn:disabled { background: #2d2850; cursor: not-allowed; }
+
+  .progress-box { background: #16161f; border: 1px solid #22222f; border-radius: 8px; padding: 10px 14px; }
+  .progress-header { display: flex; justify-content: space-between; font-size: 11px; color: #666680; margin-bottom: 6px; }
+  .progress-bar-bg { background: #22222f; border-radius: 4px; height: 4px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 4px; transition: width 1s linear, background 0.5s; }
+  .progress-warn { margin-top: 6px; font-size: 11px; color: #ff9f6b; }
+
+  .error-box { color: #ff6b6b; font-size: 13px; background: #1a0a0a; border: 1px solid #3a1a1a; border-radius: 6px; padding: 10px 14px; }
+
+  /* Result view */
+  .result-wrap { max-width: 1140px; margin: 0 auto; padding: 20px 24px; }
+  .empty-result { text-align: center; padding: 80px; color: #666680; }
+
+  /* Control bar */
+  .ctrl-bar { background: #16161f; border: 1px solid #22222f; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ctrl-label { font-size: 11px; font-weight: 700; color: #7b6fff; letter-spacing: 1px; }
+  .char-badge { background: #2d2850; color: #c8b8ff; border-radius: 20px; padding: 3px 12px; font-size: 12px; }
+  .ctrl-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .ctrl-btn { border-radius: 6px; padding: 5px 14px; cursor: pointer; font-size: 11px; font-weight: 700; }
+  .btn-ghost { background: none; border: 1px solid #22222f; color: #666680; }
+  .btn-blue { background: #16161f; border: 1px solid #6bb8ff; color: #6bb8ff; }
+  .btn-purple { background: none; border: 1px solid #7b6fff; color: #c8b8ff; }
+  .btn-purple.active { background: #2d2850; }
+  .btn-green { background: #0f2018; border: 1px solid #6bffb8; color: #6bffb8; }
+  .btn-accent { background: #7b6fff; border: none; color: #fff; }
+
+  /* Copy box */
+  .copy-box { background: #16161f; border: 1px solid #7b6fff; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+  .copy-hint { font-size: 11px; color: #666680; margin-bottom: 6px; }
+  .copy-textarea { width: 100%; height: 120px; background: #0d0d14; border: 1px solid #22222f; border-radius: 6px; color: #e2e2ee; font-size: 12px; padding: 8px 10px; resize: none; outline: none; font-family: monospace; }
+
+  /* Export */
+  .export-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .keyword-row { display: flex; gap: 6px; align-items: center; }
+  .keyword-input { width: 120px; background: #0d0d14; border: 1px solid #22222f; border-radius: 6px; color: #e2e2ee; font-size: 12px; padding: 4px 8px; outline: none; }
+  .keyword-input:focus { border-color: #7b6fff; }
+  .save-btn { background: #6bffb8; border: none; color: #000; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 11px; font-weight: 700; }
+  .no-kw-btn { background: none; border: 1px solid #22222f; color: #666680; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 11px; }
+
+  /* Revise panel */
+  .revise-panel { background: #14142a; border: 1px solid #7b6fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .revise-title { font-size: 12px; color: #c8b8ff; font-weight: 700; }
+  .revise-modes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .mode-btn { border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+  .mode-btn.active { background: #2d2850; border: 1px solid #7b6fff; color: #c8b8ff; }
+  .mode-btn:not(.active) { background: none; border: 1px solid #22222f; color: #666680; }
+  .sel-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sel-tag { background: #2d2850; color: #c8b8ff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  .revise-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .apply-btn { background: #7b6fff; border: none; color: #fff; border-radius: 8px; padding: 9px 24px; cursor: pointer; font-weight: 700; font-size: 13px; }
+  .apply-btn:disabled { background: #2d2850; cursor: not-allowed; }
+
+  /* Resources panel */
+  .res-panel { background: #0d1420; border: 1px solid #6bb8ff; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .res-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .res-title { font-size: 12px; font-weight: 700; color: #6bb8ff; }
+  .res-close { background: none; border: none; color: #666680; cursor: pointer; font-size: 13px; }
+  .res-section { margin-bottom: 10px; }
+  .res-label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .res-item { background: #16161f; border-radius: 6px; padding: 7px 12px; font-size: 12px; margin-bottom: 3px; }
+  .res-name { font-weight: 700; }
+  .res-desc { color: #666680; margin-left: 8px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #d0d0e0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+  thead tr { background: #f0f0f8; }
+  th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #5a4fcf; border-bottom: 2px solid #d0d0e0; white-space: nowrap; }
+  td { padding: 8px 12px; color: #1a1a2e; line-height: 1.8; border-right: 1px solid #d0d0e0; border-bottom: 1px solid #d0d0e0; vertical-align: top; }
+  tr.even { background: #ffffff; }
+  tr.odd { background: #f7f7fc; }
+  tr.cut-top { border-top: 2px solid #a0a0c0; }
+  tr.selected-revise { background: #e8e4ff !important; outline: 2px solid #5a4fcf; }
+  tr.selected-keep { background: #e4fff0 !important; outline: 2px solid #009050; }
+  .cut-num-badge { background: #5a4fcf; color: #fff; border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 700; display: inline-block; }
+  .cut-num-badge.revise { background: #5a4fcf; }
+  .cut-num-badge.keep { background: #006030; }
+  .cut-hint { font-size: 9px; color: #888; display: block; text-align: center; margin-top: 3px; }
+  .speaker-badge { background: #fff3e8; color: #b84000; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; border: 1px solid #ffd0a0; white-space: nowrap; }
+  .muted { color: #888; }
+</style>
+</head>
+<body>
+
+<!-- API Key Banner -->
+<div id="api-banner">
+  <label for="api-key-input">🔑 ANTHROPIC API KEY</label>
+  <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off" oninput="onApiKeyInput()" />
+  <button class="toggle-vis" onclick="toggleKeyVis()">표시</button>
+  <span id="api-key-status">API 키를 입력해 주세요</span>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="dot"></div>
+  <h1>웹툰 글 콘티 생성기</h1>
+  <span class="version">v9.0</span>
+</header>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('input')">스토리 입력</button>
+  <button class="tab-btn" id="result-tab" onclick="switchTab('result')">콘티 결과</button>
+</div>
+
+<!-- INPUT TAB -->
+<div id="tab-input" class="content active">
+  <div class="input-wrap">
+
+    <!-- 컷 수 -->
+    <div class="cut-bar">
+      <span>컷 수 범위</span>
+      <div class="cut-group"><label>최소</label><input type="number" class="cut-num" id="min-cuts" min="1" max="99" placeholder="15" /></div>
+      <div class="cut-group"><label>최대</label><input type="number" class="cut-num" id="max-cuts" min="1" max="99" placeholder="25" /></div>
+      <span class="cut-badge" id="cut-badge">총 15~25컷</span>
+      <span class="warn-badge" id="cut-warn" style="display:none">⚠ 30컷 초과 시 응답이 느려질 수 있어요</span>
+    </div>
+
+    <!-- 배경 정보 -->
+    <div>
+      <label class="field-label">배경 · 캐릭터 · 챕터 참고 정보 (선택)</label>
+      <textarea id="background" rows="5" placeholder="세계관, 캐릭터 정보, 또는 챕터 전체 스토리를 붙여넣으세요.
+
+예시:
+[세계관] 현대 한국 헌터 판타지. [성진우] 무표정하고 과묵한 S급 헌터. [아단] 송곳니 군단 엘리트 마수. 냉소적이고 여유로운 태도."></textarea>
+      <div class="file-row">
+        <input type="file" id="bg-file" accept=".txt,.md,.csv" style="display:none" onchange="handleBgFile(event)" />
+        <button class="file-btn" onclick="document.getElementById('bg-file').click()">📄 텍스트 파일 첨부</button>
+        <span id="file-badge" style="display:none" class="file-badge">
+          <span id="file-name"></span>
+          <span class="remove-file" onclick="removeFile()">✕</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- 스토리 -->
+    <div>
+      <label class="field-label">글 콘티로 만들 스토리 *</label>
+      <textarea id="story" rows="8" placeholder="콘티로 만들 장면의 스토리를 입력하세요.
+
+예시:
+아단은 차원의 문을 열어 도망치려 한다. 성진우가 그의 퇴로를 막으려 하자, 아단은 비웃으며 말한다. 이 섬에 남아 있는 인간들을 살리고 싶다면 한시라도 빨리 그들을 찾아내는 편이 좋을 것이라고."></textarea>
+    </div>
+
+    <div class="action-row">
+      <button class="example-btn" onclick="loadExample()">예시 불러오기</button>
+      <div class="action-right">
+        <button class="cancel-btn" id="cancel-btn" style="display:none" onclick="cancelRequest()">중단</button>
+        <button class="generate-btn" id="generate-btn" onclick="generate()">콘티 생성 →</button>
+      </div>
+    </div>
+
+    <div id="progress-box" style="display:none" class="progress-box">
+      <div class="progress-header"><span id="progress-msg"></span><span id="progress-time"></span></div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+      <div id="progress-warn" class="progress-warn" style="display:none">⚠ 컷 수를 줄이거나 스토리를 나눠서 시도해 보세요.</div>
+    </div>
+    <div id="input-error" class="error-box" style="display:none"></div>
+  </div>
+</div>
+
+<!-- RESULT TAB -->
+<div id="tab-result" class="content">
+  <div class="result-wrap">
+    <div id="empty-result" class="empty-result">스토리를 입력하고 콘티를 생성해 주세요.</div>
+
+    <div id="result-content" style="display:none">
+
+      <!-- 컨트롤 바 -->
+      <div class="ctrl-bar">
+        <span class="ctrl-label">등장인물</span>
+        <span id="characters-list"></span>
+        <div class="ctrl-actions">
+          <button class="ctrl-btn btn-ghost" id="undo-btn" style="display:none" onclick="undoRevise()">↩ 되돌리기</button>
+          <button class="ctrl-btn btn-blue" onclick="generateResources()">📋 리소스 리스트</button>
+          <button class="ctrl-btn btn-purple" id="copy-toggle-btn" onclick="toggleCopyBox()">📋 텍스트 복사</button>
+          <div class="export-wrap">
+            <button class="ctrl-btn btn-green" onclick="handleExport()">⬇ TSV 내보내기</button>
+            <div id="keyword-row" class="keyword-row" style="display:none">
+              <input type="text" class="keyword-input" id="export-keyword" placeholder="파일명 키워드" onkeydown="if(event.key==='Enter')saveWithKeyword()" />
+              <button class="save-btn" onclick="saveWithKeyword()">저장</button>
+              <button class="no-kw-btn" onclick="saveNoKeyword()">키워드 없이</button>
+            </div>
+          </div>
+          <button class="ctrl-btn btn-accent" id="revise-toggle-btn" onclick="toggleReviseMode()">✏ 수정 모드</button>
+          <button class="ctrl-btn btn-ghost" id="cancel-btn-result" style="display:none" onclick="cancelRequest()">중단</button>
+        </div>
+      </div>
+
+      <!-- 텍스트 복사 박스 -->
+      <div id="copy-box" class="copy-box" style="display:none">
+        <div class="copy-hint">아래 텍스트를 클릭 후 Ctrl+A → Ctrl+C로 복사하세요.</div>
+        <textarea class="copy-textarea" id="copy-textarea" readonly onclick="this.select();this.setSelectionRange(0,99999)"></textarea>
+      </div>
+
+      <!-- 수정 패널 -->
+      <div id="revise-panel" class="revise-panel" style="display:none">
+        <div class="revise-title">✏ 수정 모드 — 테이블에서 컷을 클릭해 선택하세요</div>
+        <div class="revise-modes">
+          <button class="mode-btn active" id="mode-revise" onclick="setSelectMode('revise')">선택한 컷 수정</button>
+          <button class="mode-btn" id="mode-keep" onclick="setSelectMode('keep')">선택한 컷 유지 (나머지 수정)</button>
+          <button class="ctrl-btn btn-ghost" onclick="selectAllCuts()">전체 선택</button>
+          <button class="ctrl-btn btn-ghost" onclick="clearCutSelection()">전체 해제</button>
+          <span id="sel-count" style="font-size:11px;color:#666680">0개 선택</span>
+        </div>
+        <div id="sel-tags" class="sel-tags"></div>
+        <div>
+          <label class="field-label" style="color:#c8b8ff">수정 지시 사항</label>
+          <textarea id="revise-instruction" rows="4" placeholder="예시:
+- 3번 컷을 클로즈업으로 변경하고 긴장감을 더 강조해줘
+- 5~7번 컷 전투 장면을 더 역동적으로
+- 대사를 줄이고 묘사 위주로"></textarea>
+        </div>
+        <div class="revise-actions">
+          <button class="apply-btn" id="apply-btn" onclick="revise()">수정 적용 →</button>
+        </div>
+      </div>
+
+      <!-- 리소스 패널 -->
+      <div id="res-panel" class="res-panel" style="display:none">
+        <div class="res-header">
+          <span class="res-title">📋 필요 예상 리소스 리스트</span>
+          <button class="res-close" onclick="document.getElementById('res-panel').style.display='none'">✕</button>
+        </div>
+        <div id="res-content"></div>
+      </div>
+
+      <div id="result-error" class="error-box" style="display:none"></div>
+
+      <!-- 테이블 -->
+      <div class="table-wrap">
+        <table id="conte-table">
+          <thead>
+            <tr>
+              <th style="width:44px">씬</th>
+              <th style="width:38%">상황</th>
+              <th style="width:80px">화자</th>
+              <th style="width:24%">대사 / 나레이션</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody id="conte-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `# Role: 웹툰 전문 스토리보드 작가 및 콘티 라이터
+
+## 절대 원칙
+- 1컷 = 1장면 = 1구도. 카메라는 절대 움직이지 않는다.
+- 한 컷 안에 두 개 이상의 행동·시점이 있으면 반드시 컷을 분리한다.
+
+## 상황 묘사 규칙
+- 상황은 그림 작가가 보자마자 장면이 눈에 선하게 그려질 만큼 구체적으로 묘사한다.
+- 인물의 위치, 자세, 시선 방향, 표정, 미세한 감정 변화까지 포함한다.
+- 구도(샷 사이즈, 앵글, 프레임 구성)를 상황 설명 안에 자연스럽게 녹인다.
+- 연출 의도(긴장감, 공포, 여운 등)도 묘사 안에 녹여서 작가가 톤을 파악할 수 있게 한다.
+- 컷마다 2~4줄이 기본이지만, 장면에 따라 1줄이나 5줄도 가능하다. 줄 수보다 구체성이 우선이다.
+- 좋은 예: "아그네스의 정면 클로즈업. 눈이 천천히 크게 떠지며 동공이 흔들린다. 입술이 미세하게 떨리고 있다. 경악과 분노가 뒤섞인 표정으로, 평소의 냉정함이 완전히 무너진 순간."
+- 나쁜 예: "아그네스 클로즈업. 놀란 표정."
+- 연결 컷이면 상황 첫 줄에 "◀ N번 컷과 연결." 명시.
+- 줄바꿈은 \\n 으로 표시. 문장 하나가 끝날 때마다 \\n 삽입.
+- 강조 단어는 **볼드** 표시.
+
+## 출력 규칙
+- speaker: 화자 이름. 없으면 null.
+- dialogue: 대사. 독백은 (괄호). 없으면 null. 큰따옴표 사용 금지.
+- note: 원작 레퍼런스, UI 사용 여부, 기획자 특별 지시사항만. 연출 관련 내용은 모두 situation에 포함. 없으면 null.
+
+반드시 유효한 JSON만 출력. 코드블록 금지.
+{
+  "characters": [{ "name": "이름", "state": "외형·감정 요약" }],
+  "cuts": [{
+    "cut": 1,
+    "situation": "줄1\\n줄2\\n줄3",
+    "speaker": "화자 또는 null",
+    "dialogue": "대사 또는 null",
+    "note": "비고 또는 null"
+  }]
+}`;
+
+const REVISE_SYSTEM = `# Role: 웹툰 글 콘티 수정 전문가
+수정 대상 컷만 재작성. 1컷=1장면 원칙 유지.
+줄바꿈은 \\n. 강조는 **볼드**.
+반드시 유효한 JSON만 출력. 코드블록 금지.
+{ "revised_cuts": [{ "cut": 번호, "situation": "...", "speaker": "...", "dialogue": "...", "note": "..." }] }`;
+
+const RESOURCE_SYSTEM = `# Role: 웹툰 아트 리소스 매니저
+제공된 콘티를 분석해 그림 작가가 필요한 아트 리소스를 정리한다.
+반드시 유효한 JSON만 출력. 코드블록 금지.
+{
+  "characters": [{ "name": "이름", "desc": "등장 컷, 주의사항" }],
+  "backgrounds": [{ "name": "배경명", "desc": "등장 컷, 분위기" }],
+  "objects": [{ "name": "오브젝트명", "desc": "등장 컷, 주의사항" }],
+  "references": [{ "name": "레퍼런스명", "desc": "해당 컷, 원작 출처" }]
+}`;
+
+const EXAMPLE_STORY = `아단은 차원의 문을 열어 도망치려 한다. 성진우가 그의 퇴로를 막으려 하자, 아단은 비웃으며 말한다. 이 섬에 남아 있는 인간들을 살리고 싶다면 한시라도 빨리 그들을 찾아내는 편이 좋을 것이라고.`;
+const EXAMPLE_BG = `[세계관] 현대 한국 헌터 판타지. [성진우] 무표정하고 과묵한 S급 헌터. [아단] 송곳니 군단 엘리트 마수. 냉소적이고 여유로운 태도.`;
+const DOTS = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
+
+let result = null;
+let history = [];
+let reviseMode = false;
+let selectMode = 'revise';
+let selectedCuts = new Set();
+let loading = false;
+let elapsed = 0;
+let loadingMsg = '';
+let abortCtrl = null;
+let timerInterval = null;
+let showKeywordInput = false;
+let showCopyBox = false;
+let resources = null;
+
+// --- API Key ---
+function getApiKey() { return document.getElementById('api-key-input').value.trim(); }
+function onApiKeyInput() {
+  const k = getApiKey();
+  const s = document.getElementById('api-key-status');
+  if (!k) { s.textContent = 'API 키를 입력해 주세요'; s.className = ''; }
+  else if (k.startsWith('sk-ant-')) { s.textContent = '✓ 키 형식 확인됨'; s.className = 'ok'; }
+  else { s.textContent = '⚠ sk-ant- 로 시작하는 키를 입력해 주세요'; s.className = ''; }
+}
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// --- Tabs ---
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i === (tab==='input'?0:1)));
+  document.getElementById('tab-input').classList.toggle('active', tab==='input');
+  document.getElementById('tab-result').classList.toggle('active', tab==='result');
+}
+
+// --- Cut range ---
+document.getElementById('min-cuts').addEventListener('input', updateCutBadge);
+document.getElementById('max-cuts').addEventListener('input', updateCutBadge);
+function updateCutBadge() {
+  const mn = parseInt(document.getElementById('min-cuts').value) || 15;
+  const mx = parseInt(document.getElementById('max-cuts').value) || 25;
+  document.getElementById('cut-badge').textContent = `총 ${mn}~${Math.max(mn,mx)}컷`;
+  document.getElementById('cut-warn').style.display = mx > 30 ? '' : 'none';
+}
+
+// --- File ---
+async function handleBgFile(e) {
+  const file = e.target.files?.[0]; if (!file) return;
+  if (file.size > 300000) { showError('input-error', '파일이 너무 커요. 300KB 이하를 사용해 주세요.'); return; }
+  const text = await file.text();
+  document.getElementById('background').value = text;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-badge').style.display = '';
+  e.target.value = '';
+}
+function removeFile() {
+  document.getElementById('background').value = '';
+  document.getElementById('file-badge').style.display = 'none';
+}
+
+// --- Example ---
+function loadExample() {
+  document.getElementById('story').value = EXAMPLE_STORY;
+  document.getElementById('background').value = EXAMPLE_BG;
+}
+
+// --- Helpers ---
+function stripBold(t) { return (t||'').replace(/\*\*/g,''); }
+function parseBold(text) {
+  if (!text) return '';
+  return text.split(/(\*\*[^*]+\*\*)/g).map(p =>
+    p.startsWith('**') && p.endsWith('**') ? `<strong>${p.slice(2,-2)}</strong>` : escHtml(p)
+  ).join('');
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function splitLines(t) { return (t||'').split(/\\n|\n/).map(s=>s.trim()).filter(Boolean); }
+function splitSentences(text) {
+  if (!text) return [];
+  const stripped = stripBold(text);
+  const byNl = stripped.split(/\\n|\n/).map(s=>s.trim()).filter(Boolean);
+  if (byNl.length > 1) return byNl;
+  const byPunct = stripped
+    .replace(/([.!?。]+)\s+/g,'$1\n')
+    .replace(/([다요죠야어아]\.?)\s+(?=[가-힣A-Z\[(])/g,'$1\n')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
+  if (byPunct.length > 1) return byPunct;
+  return [stripped.trim()].filter(Boolean);
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = '⚠ ' + msg;
+  el.style.display = msg ? '' : 'none';
+}
+function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+// --- Loading ---
+function startLoading(msg) {
+  loading = true; loadingMsg = msg; elapsed = 0;
+  updateGenerateBtn();
+  document.getElementById('cancel-btn').style.display = '';
+  document.getElementById('cancel-btn-result').style.display = '';
+  document.getElementById('progress-box').style.display = '';
+  timerInterval = setInterval(() => {
+    elapsed++;
+    updateGenerateBtn();
+    const pct = Math.min((elapsed/90)*100,100);
+    document.getElementById('progress-bar').style.width = pct+'%';
+    document.getElementById('progress-bar').style.background = elapsed>70?'#ff6b6b':elapsed>45?'#ff9f6b':'#7b6fff';
+    document.getElementById('progress-time').textContent = `${elapsed}s / 90s`;
+    document.getElementById('progress-warn').style.display = elapsed>70?'':'none';
+  }, 1000);
+  document.getElementById('progress-msg').textContent = msg;
+  document.getElementById('progress-time').textContent = '0s / 90s';
+  document.getElementById('progress-bar').style.width = '0%';
+}
+function stopLoading() {
+  loading = false;
+  clearInterval(timerInterval);
+  document.getElementById('cancel-btn').style.display = 'none';
+  document.getElementById('cancel-btn-result').style.display = 'none';
+  document.getElementById('progress-box').style.display = 'none';
+  updateGenerateBtn();
+}
+function updateGenerateBtn() {
+  const btn = document.getElementById('generate-btn');
+  const story = document.getElementById('story').value.trim();
+  btn.disabled = loading || !story;
+  btn.textContent = loading ? `${DOTS[elapsed%10]} ${loadingMsg} ${elapsed}s` : '콘티 생성 →';
+}
+function cancelRequest() {
+  abortCtrl?.abort();
+  stopLoading();
+}
+
+// --- API Call ---
+async function callAPI(sys, content, signal) {
+  const key = getApiKey();
+  if (!key) throw new Error('API 키를 먼저 입력해 주세요.');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', signal,
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 7000, system: sys, messages: [{ role: 'user', content }] }),
+  });
+  if (!res.ok) {
+    let msg = `서버 오류 (HTTP ${res.status})`;
+    try { const e = await res.json(); msg = e?.error?.message || msg; } catch(_) {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const raw = (data.content||[]).map(b=>b.text||'').join('');
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('JSON 응답을 찾지 못했어요.');
+  try { return JSON.parse(match[0]); }
+  catch(_) { throw new Error('JSON 파싱 실패. 다시 시도해 주세요.'); }
+}
+
+async function withTimeout(fn, errId) {
+  startLoading(loadingMsg);
+  hideError(errId);
+  abortCtrl = new AbortController();
+  const tid = setTimeout(() => { abortCtrl.abort(); showError(errId,'시간 초과(90초). 스토리를 나눠서 시도해 주세요.'); stopLoading(); }, 90000);
+  try { await fn(abortCtrl.signal); }
+  catch(e) { if (e.name !== 'AbortError') showError(errId, e.message || '알 수 없는 오류'); }
+  finally { clearTimeout(tid); stopLoading(); }
+}
+
+// --- Generate ---
+async function generate() {
+  const story = document.getElementById('story').value.trim();
+  if (!story) return;
+  loadingMsg = '콘티 생성 중...';
+  const mn = parseInt(document.getElementById('min-cuts').value) || 15;
+  const mx = Math.max(mn, parseInt(document.getElementById('max-cuts').value) || 25);
+  const bg = document.getElementById('background').value.trim();
+  const userContent = [
+    bg ? `## 배경·캐릭터·챕터 참고 정보\n${bg}` : '',
+    `## 글 콘티로 만들 스토리\n${story}`,
+    `## 컷 수 지시\n${mn}컷 이상 ${mx}컷 이하. 1컷=1장면 원칙 준수.`,
+  ].filter(Boolean).join('\n\n');
+  await withTimeout(async signal => {
+    const parsed = await callAPI(SYSTEM_PROMPT, userContent, signal);
+    if (!Array.isArray(parsed?.cuts) || !parsed.cuts.length) throw new Error('콘티 데이터가 올바르지 않아요.');
+    result = parsed; history = []; resources = null;
+    document.getElementById('res-panel').style.display = 'none';
+    reviseMode = false; selectedCuts = new Set();
+    renderResult();
+    switchTab('result');
+    document.getElementById('result-tab').textContent = `콘티 결과 (${result.cuts.length}컷)`;
+  }, 'input-error');
+}
+
+// --- Revise ---
+async function revise() {
+  if (!result) return;
+  const instruction = document.getElementById('revise-instruction').value.trim();
+  if (!instruction) return;
+  loadingMsg = '컷 수정 중...';
+  const allNums = result.cuts.map(c=>c.cut);
+  let targetNums = selectMode === 'revise'
+    ? (selectedCuts.size > 0 ? [...selectedCuts] : allNums)
+    : allNums.filter(n => !selectedCuts.has(n));
+  if (!targetNums.length) { showError('result-error','수정할 컷이 없어요.'); return; }
+  const targetCuts = result.cuts.filter(c => targetNums.includes(c.cut));
+  const ctxNums = new Set(targetNums.flatMap(n => [-2,-1,0,1,2].map(d=>n+d)));
+  const ctx = result.cuts.filter(c=>ctxNums.has(c.cut)).map(c=>`[컷${c.cut}] ${(c.situation||'').slice(0,60)}`).join(' | ');
+  const bg = document.getElementById('background').value.trim();
+  const userContent = [
+    bg ? `## 배경 참고\n${bg.slice(0,400)}` : '',
+    `## 맥락 (인접 컷 요약)\n${ctx}`,
+    `## 수정 대상 컷\n${JSON.stringify(targetCuts)}`,
+    `## 수정 지시\n${instruction}`,
+  ].filter(Boolean).join('\n\n');
+  await withTimeout(async signal => {
+    const parsed = await callAPI(REVISE_SYSTEM, userContent, signal);
+    if (!Array.isArray(parsed?.revised_cuts)) throw new Error('수정 응답이 올바르지 않아요.');
+    history.push(JSON.parse(JSON.stringify(result)));
+    const map = new Map(result.cuts.map(c=>[c.cut,c]));
+    parsed.revised_cuts.forEach(c => map.set(c.cut, {...c}));
+    result = { ...result, cuts: [...map.values()].sort((a,b)=>a.cut-b.cut) };
+    reviseMode = false; selectedCuts = new Set();
+    document.getElementById('revise-instruction').value = '';
+    renderResult();
+    document.getElementById('result-tab').textContent = `콘티 결과 (${result.cuts.length}컷)`;
+  }, 'result-error');
+}
+
+function undoRevise() {
+  if (!history.length) return;
+  result = history.pop();
+  renderResult();
+  document.getElementById('result-tab').textContent = `콘티 결과 (${result.cuts.length}컷)`;
+}
+
+// --- Resources ---
+async function generateResources() {
+  if (!result) return;
+  loadingMsg = '리소스 분석 중...';
+  document.getElementById('res-panel').style.display = '';
+  document.getElementById('res-content').innerHTML = '<div style="color:#666680;font-size:13px">분석 중...</div>';
+  const bg = document.getElementById('background').value.trim();
+  const userContent = `## 글 콘티\n${JSON.stringify(result.cuts)}\n\n## 배경 정보\n${bg||'없음'}`;
+  await withTimeout(async signal => {
+    resources = await callAPI(RESOURCE_SYSTEM, userContent, signal);
+    renderResources();
+  }, 'result-error');
+}
+
+function renderResources() {
+  if (!resources) return;
+  const sections = [
+    { key: 'characters', label: '👤 캐릭터', color: '#ff9f6b' },
+    { key: 'backgrounds', label: '🏞 배경', color: '#6bffb8' },
+    { key: 'objects', label: '🗡 오브젝트', color: '#c8b8ff' },
+    { key: 'references', label: '📌 원작 레퍼런스', color: '#ffe066' },
+  ];
+  let html = '';
+  for (const {key, label, color} of sections) {
+    const items = resources[key] || [];
+    if (!items.length) continue;
+    html += `<div class="res-section"><div class="res-label" style="color:${color}">${label}</div>`;
+    for (const item of items) {
+      html += `<div class="res-item"><span class="res-name" style="color:${color}">${escHtml(item.name)}</span><span class="res-desc">${escHtml(item.desc)}</span></div>`;
+    }
+    html += '</div>';
+  }
+  document.getElementById('res-content').innerHTML = html || '<div style="color:#666680">리소스 없음</div>';
+}
+
+// --- Render result ---
+function renderResult() {
+  if (!result) return;
+  document.getElementById('empty-result').style.display = 'none';
+  document.getElementById('result-content').style.display = '';
+  // Characters
+  const charHtml = (result.characters||[]).map(c=>`<span class="char-badge"><b>${escHtml(c.name)}</b> — ${escHtml(c.state)}</span>`).join('');
+  document.getElementById('characters-list').innerHTML = charHtml;
+  // Undo btn
+  document.getElementById('undo-btn').style.display = history.length ? '' : 'none';
+  document.getElementById('undo-btn').textContent = `↩ 되돌리기 (${history.length})`;
+  // Revise panel
+  document.getElementById('revise-panel').style.display = reviseMode ? '' : 'none';
+  document.getElementById('revise-toggle-btn').textContent = reviseMode ? '✕ 수정 취소' : '✏ 수정 모드';
+  document.getElementById('revise-toggle-btn').style.background = reviseMode ? '#7b6fff' : '';
+  // Table
+  renderTable();
+  // Copy textarea
+  if (showCopyBox) document.getElementById('copy-textarea').value = toTSV();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('conte-tbody');
+  tbody.innerHTML = '';
+  result.cuts.forEach((c, cutIdx) => {
+    const isSelected = selectedCuts.has(c.cut);
+    const isRevise = reviseMode && isSelected && selectMode === 'revise';
+    const isKeep = reviseMode && isSelected && selectMode === 'keep';
+    const sentences = splitSentences(c.situation);
+    const safe = sentences.length > 0 ? sentences : [stripBold(c.situation||'')];
+
+    safe.forEach((sent, si) => {
+      const tr = document.createElement('tr');
+      tr.className = (cutIdx%2===0?'even':'odd') + (cutIdx>0&&si===0?' cut-top':'');
+      if (reviseMode && isRevise) tr.classList.add('selected-revise');
+      if (reviseMode && isKeep) tr.classList.add('selected-keep');
+      if (reviseMode && si===0) tr.style.cursor = 'pointer';
+
+      if (reviseMode && si===0) {
+        tr.addEventListener('click', () => toggleCut(c.cut));
+      }
+
+      // Cut number cell
+      const tdCut = document.createElement('td');
+      tdCut.style.textAlign = 'center';
+      tdCut.style.borderRight = '1px solid #d0d0e0';
+      if (si===0) {
+        const badge = `<span class="cut-num-badge ${isRevise?'revise':isKeep?'keep':''}">${c.cut}</span>`;
+        const hint = reviseMode ? `<span class="cut-hint">${isSelected?'✓':'클릭'}</span>` : '';
+        tdCut.innerHTML = badge + hint;
+      }
+      tr.appendChild(tdCut);
+
+      // Situation
+      const tdSit = document.createElement('td');
+      tdSit.style.borderRight = '1px solid #d0d0e0';
+      tdSit.innerHTML = parseBold(sent);
+      tr.appendChild(tdSit);
+
+      // Speaker
+      const tdSpk = document.createElement('td');
+      tdSpk.style.borderRight = '1px solid #d0d0e0';
+      if (si===0) {
+        tdSpk.innerHTML = c.speaker
+          ? `<span class="speaker-badge">${escHtml(c.speaker)}</span>`
+          : '<span class="muted">—</span>';
+      } else { tdSpk.innerHTML = ''; }
+      tr.appendChild(tdSpk);
+
+      // Dialogue
+      const tdDlg = document.createElement('td');
+      tdDlg.style.borderRight = '1px solid #d0d0e0';
+      if (si===0) {
+        tdDlg.innerHTML = c.dialogue ? parseBold(c.dialogue) : '<span class="muted">—</span>';
+      }
+      tr.appendChild(tdDlg);
+
+      // Note
+      const tdNote = document.createElement('td');
+      tdNote.style.color = '#4060a0'; tdNote.style.fontSize = '12px';
+      if (si===0) {
+        tdNote.innerHTML = c.note ? parseBold(c.note) : '<span class="muted">—</span>';
+      }
+      tr.appendChild(tdNote);
+
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+// --- Revise mode ---
+function toggleReviseMode() {
+  reviseMode = !reviseMode;
+  selectedCuts = new Set();
+  document.getElementById('revise-instruction').value = '';
+  renderResult();
+  updateSelUI();
+}
+function setSelectMode(mode) {
+  selectMode = mode;
+  selectedCuts = new Set();
+  document.getElementById('mode-revise').classList.toggle('active', mode==='revise');
+  document.getElementById('mode-keep').classList.toggle('active', mode==='keep');
+  updateSelUI();
+  renderTable();
+}
+function toggleCut(n) {
+  selectedCuts.has(n) ? selectedCuts.delete(n) : selectedCuts.add(n);
+  updateSelUI();
+  renderTable();
+}
+function selectAllCuts() {
+  selectedCuts = new Set(result.cuts.map(c=>c.cut));
+  updateSelUI(); renderTable();
+}
+function clearCutSelection() {
+  selectedCuts = new Set();
+  updateSelUI(); renderTable();
+}
+function updateSelUI() {
+  document.getElementById('sel-count').textContent = `${selectedCuts.size}개 선택`;
+  const tags = [...selectedCuts].sort((a,b)=>a-b).map(n=>`<span class="sel-tag" onclick="toggleCut(${n})">컷 ${n} ✕</span>`).join('');
+  document.getElementById('sel-tags').innerHTML = tags;
+  const applyBtn = document.getElementById('apply-btn');
+  const inst = document.getElementById('revise-instruction').value.trim();
+  applyBtn.disabled = loading || !inst;
+}
+document.getElementById('revise-instruction').addEventListener('input', updateSelUI);
+
+// --- Copy / Export ---
+function toggleCopyBox() {
+  showCopyBox = !showCopyBox;
+  document.getElementById('copy-box').style.display = showCopyBox ? '' : 'none';
+  document.getElementById('copy-toggle-btn').textContent = showCopyBox ? '✕ 복사창 닫기' : '📋 텍스트 복사';
+  document.getElementById('copy-toggle-btn').classList.toggle('active', showCopyBox);
+  if (showCopyBox && result) {
+    document.getElementById('copy-textarea').value = toTSV();
+    setTimeout(()=>{ const t=document.getElementById('copy-textarea'); t.select(); t.setSelectionRange(0,99999); },100);
+  }
+}
+function toTSV() {
+  if (!result) return '';
+  const headers = ['컷','상황','화자','대사','비고'];
+  const rows = result.cuts.map(c=>[
+    c.cut,
+    stripBold(splitLines(c.situation).join(' ')),
+    c.speaker||'',
+    stripBold(c.dialogue||''),
+    stripBold(c.note||''),
+  ]);
+  return [headers,...rows].map(r=>r.join('\t')).join('\n');
+}
+function downloadTSV(keyword) {
+  const tsv = toTSV();
+  const blob = new Blob(['\uFEFF'+tsv], {type:'text/tab-separated-values;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = keyword ? `${keyword}_conte.tsv` : 'conte.tsv';
+  a.click();
+}
+function handleExport() {
+  showKeywordInput = !showKeywordInput;
+  document.getElementById('keyword-row').style.display = showKeywordInput ? '' : 'none';
+}
+function saveWithKeyword() {
+  const kw = document.getElementById('export-keyword').value.trim();
+  downloadTSV(kw);
+  showKeywordInput = false;
+  document.getElementById('keyword-row').style.display = 'none';
+  document.getElementById('export-keyword').value = '';
+}
+function saveNoKeyword() {
+  downloadTSV('');
+  showKeywordInput = false;
+  document.getElementById('keyword-row').style.display = 'none';
+}
+
+// --- Story input listener ---
+document.getElementById('story').addEventListener('input', updateGenerateBtn);
+updateGenerateBtn();
+updateCutBadge();
+</script>
+</body>
+</html>
